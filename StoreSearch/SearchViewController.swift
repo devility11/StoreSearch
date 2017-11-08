@@ -25,6 +25,8 @@ class SearchViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        //show the keyboard when the user start to type
+        searchBar.becomeFirstResponder()
         //add a 64 point margin to the top, because we cant see the first cell
         //the searchbar is on the tableview
         tableView.contentInset = UIEdgeInsets(top: 64, left: 0, bottom: 0, right: 0)
@@ -37,6 +39,25 @@ class SearchViewController: UIViewController {
         cellNib = UINib(nibName: TableViewCellIdentifiers.nothingFoundCell, bundle: nil)
         tableView.register(cellNib, forCellReuseIdentifier: TableViewCellIdentifiers.nothingFoundCell)
         
+    }
+    
+    func iTunesUrl(searchText: String) -> URL {
+        let escapedSearchText = searchText.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed)!
+        let urlString = String(format: "https://itunes.apple.com/search?term=%@", escapedSearchText)
+        let url = URL(string: urlString)
+        return url!
+    }
+    
+    func performStoreRequest(with url: URL) -> String? {
+        //because of the network loss or down, we are using the
+        // do-try-catch block
+        do {
+            //we will pass back the data as a string
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            print("Download error: \(error)")
+            return nil
+        }
     }
     
     
@@ -52,19 +73,19 @@ extension SearchViewController: UISearchBarDelegate {
     }
     //handle the searchButton click events
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        searchResults = []
-        //this will hide the keyboard
-        searchBar.resignFirstResponder()
-        
-        if searchBar.text! != "justin" {
-            for i in 0...2 {
-                let searchResult = SearchResult()
-                searchResult.name = String(format: "Fake result %d for", i)
-                searchResult.artistName = searchBar.text!
-                searchResults.append(searchResult)
+        if !searchBar.text!.isEmpty {
+            //this will hide the keyboard
+            searchBar.resignFirstResponder()
+            searchResults = []
+            hasSearched = true
+            
+            let url = iTunesUrl(searchText: searchBar.text!)
+            print("url: '\(url)'")
+            
+            if let jsonString = performStoreRequest(with: url) {
+                print("MY json '\(jsonString)'")
             }
         }
-        hasSearched = true
         tableView.reloadData()
     }
 }
