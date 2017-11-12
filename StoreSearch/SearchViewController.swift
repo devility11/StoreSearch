@@ -60,10 +60,86 @@ class SearchViewController: UIViewController {
         }
     }
     
-    
+    func showNetworkError() {
+        let alert = UIAlertController(title: "Whoops...", message: "there was an error during the json stuff", preferredStyle: .alert)
+        
+        let action = UIAlertAction(title: "OK", style: .default, handler: nil)
+        alert.addAction(action)
+        
+        present(alert, animated: true, completion: nil)
+    }
+
     
     
 }
+
+
+func parse(dictionary: [String: Any]) -> [SearchResult] {
+    guard let array = dictionary["results"] as? [Any] else {
+        print("expected results array")
+        return []
+    }
+    
+    var searchResults = [SearchResult]()
+    
+    for resultDict in array {
+        
+        if let resultDict = resultDict as? [String: Any] {
+            
+            var searchResult: SearchResult?
+            
+            if let wrapperType = resultDict["wrapperType"] as? String {
+                switch wrapperType {
+                    case "track":
+                        searchResult = parse(track: resultDict)
+                    default:
+                        break
+                }
+            }
+            
+            if let result = searchResult {
+                searchResults.append(result)
+            }
+        }
+    }
+    return searchResults
+}
+
+func parse(track dictionary: [String: Any]) -> SearchResult {
+    let searchResult = SearchResult()
+    
+    searchResult.name = dictionary["trackName"] as! String
+    searchResult.artistName = dictionary["artistName"] as! String
+    searchResult.artworkSmallURL = dictionary["artworkUrl60"] as! String
+    searchResult.artworkLargeURL = dictionary["artworkUrl100"] as! String
+    searchResult.storeURL = dictionary["trackViewUrl"] as! String
+    searchResult.kind = dictionary["kind"] as! String
+    searchResult.currency = dictionary["currency"] as! String
+    if let price = dictionary["trackPrice"] as? Double {
+        searchResult.price = price
+    }
+    if let genre = dictionary["primaryGenreName"] as? String {
+        searchResult.genre = genre
+    }
+    return searchResult
+}
+
+func parse(json: String) -> [String: Any]? {
+    //because the json data is a string, we have to put it into a data object
+    // there is a chance that this tring to data conversion failed and because of this
+    //we are using the guard
+    // if lettol elteroen a guard visszaaad  egy nilt es nem all meg a program futasa
+    guard let data = json.data(using: .utf8, allowLossyConversion: false)
+        else {return nil}
+    
+    do {
+        return try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+    } catch {
+        print("json error \(error)")
+        return nil
+    }
+}
+
 
 // MARK: searchBar delegate
 extension SearchViewController: UISearchBarDelegate {
@@ -84,9 +160,15 @@ extension SearchViewController: UISearchBarDelegate {
             
             if let jsonString = performStoreRequest(with: url) {
                 print("MY json '\(jsonString)'")
+                if let jsonDictionary = parse(json: jsonString){
+                    print("dictionary \(jsonDictionary)")
+                    parse(dictionary: jsonDictionary)
+                    tableView.reloadData()
+                    return
+                }
             }
+            showNetworkError()
         }
-        tableView.reloadData()
     }
 }
 
@@ -134,4 +216,9 @@ extension SearchViewController: UITableViewDelegate {
     }
     
 }
+
+
+
+
+
 
