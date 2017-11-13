@@ -51,6 +51,7 @@ class SearchViewController: UIViewController {
         return url!
     }
     
+    /*
     func performStoreRequest(with url: URL) -> String? {
         //because of the network loss or down, we are using the
         // do-try-catch block
@@ -61,7 +62,7 @@ class SearchViewController: UIViewController {
             print("Download error: \(error)")
             return nil
         }
-    }
+    }*/
     
     func showNetworkError() {
         let alert = UIAlertController(title: "Whoops...", message: "there was an error during the json stuff", preferredStyle: .alert)
@@ -149,13 +150,13 @@ class SearchViewController: UIViewController {
     
     
     
-    func parse(json: String) -> [String: Any]? {
+    func parse(json data: Data) -> [String: Any]? {
         //because the json data is a string, we have to put it into a data object
         // there is a chance that this tring to data conversion failed and because of this
         //we are using the guard
         // if lettol elteroen a guard visszaaad  egy nilt es nem all meg a program futasa
-        guard let data = json.data(using: .utf8, allowLossyConversion: false)
-            else {return nil}
+        //guard let data = json.data(using: .utf8, allowLossyConversion: false)
+          //  else {return nil}
         
         do {
             return try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
@@ -232,30 +233,41 @@ extension SearchViewController: UISearchBarDelegate {
             hasSearched = true
             
             let url = self.iTunesUrl(searchText: searchBar.text!)
-            
-            // this queue provided by the system
-            let queue = DispatchQueue.global()
-            // execute the code in asnyc in the background
-            queue.async {
-                
-                if let jsonString = self.performStoreRequest(with: url),
-                    let jsonDictionary = self.parse(json: jsonString) {
-                    self.searchResults = self.parse(dictionary: jsonDictionary)
-                    self.searchResults.sort(by: { result1, result2 in
-                    return result1.name.localizedStandardCompare(result2.name) == .orderedAscending
-                    })
-                    // a user interfacet (UIKIT) erinto kodok csak a MAIN-ben futhathatoak
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        self.tableView.reloadData()
+            //also an async process
+            let session = URLSession.shared
+            // datatask is for sending https get requests to the server url
+            let dataTask = session.dataTask(with: url, completionHandler: { data, response, error in
+                if let error = error {
+                    print("errro \(error)")
+                } else if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    if let data = data, let jsonDictionary = self.parse(json: data) {
+                        self.searchResults = self.parse(dictionary: jsonDictionary)
+                        self.searchResults.sort(by: { result1, result2 in
+                            return result1.name.localizedStandardCompare(result2.name) == .orderedAscending
+                        })
+                        
+                        DispatchQueue.main.async {
+                            self.isLoading = false
+                            self.tableView.reloadData()
+                        }
+                        return
+                        
                     }
-                    return
+                } else {
+                    print("response \(response!)")
                 }
-                // a user interfacet (UIKIT) erinto kodok csak a MAIN-ben futhathatoak
+                
                 DispatchQueue.main.async {
+                    self.hasSearched = false
+                    self.isLoading = false
+                    self.tableView.reloadData()
                     self.showNetworkError()
                 }
-            }
+                
+            })
+            //we need the resume to start the closure code
+            dataTask.resume()
+            
         }
     }
 }
