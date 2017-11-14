@@ -12,10 +12,16 @@ class SearchViewController: UIViewController {
 
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var searchBar: UISearchBar!
+    @IBOutlet weak var segmentedControl: UISegmentedControl!
+    @IBAction func segmentChanged(_ sender: UISegmentedControl) {
+        performSearch()
+    }
     
     var searchResults = [SearchResult]()
     var hasSearched = false
     var isLoading = false
+    //optional because we wont have a datatask until th user perfoms a search
+    var dataTask: URLSessionDataTask?
     
     struct TableViewCellIdentifiers {
         static let searchResultCell = "SearchResultCell"
@@ -30,7 +36,7 @@ class SearchViewController: UIViewController {
         searchBar.becomeFirstResponder()
         //add a 64 point margin to the top, because we cant see the first cell
         //the searchbar is on the tableview
-        tableView.contentInset = UIEdgeInsets(top: 64, left: 0, bottom: 0, right: 0)
+        tableView.contentInset = UIEdgeInsets(top: 108, left: 0, bottom: 0, right: 0)
         
         tableView.rowHeight = 80
         
@@ -44,9 +50,19 @@ class SearchViewController: UIViewController {
         
     }
     
-    func iTunesUrl(searchText: String) -> URL {
+    func iTunesUrl(searchText: String, category: Int) -> URL {
+        
+        let entityName: String
+        switch category {
+            case 1: entityName = "musicTrack"
+            case 2: entityName = "software"
+            case 3: entityName = "ebook"
+            default: entityName = ""
+        }
+        
         let escapedSearchText = searchText.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed)!
-        let urlString = String(format: "https://itunes.apple.com/search?term=%@", escapedSearchText)
+        let urlString = String(format: "https://itunes.apple.com/search?term=%@&limit=200&entity=%@", escapedSearchText, entityName)
+        
         let url = URL(string: urlString)
         return url!
     }
@@ -219,12 +235,20 @@ extension SearchViewController: UISearchBarDelegate {
     func position(for bar: UIBarPositioning) -> UIBarPosition {
         return .topAttached
     }
-    //handle the searchButton click events
+    
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        performSearch()
+    }
+    
+    //handle the searchButton click events
+    func performSearch() {
         
         if !searchBar.text!.isEmpty {
             //this will hide the keyboard
             searchBar.resignFirstResponder()
+            
+            //this will cancel the actual search if the user taps the button
+            dataTask?.cancel()
             
             isLoading = true
             tableView.reloadData()
@@ -232,15 +256,18 @@ extension SearchViewController: UISearchBarDelegate {
             searchResults = []
             hasSearched = true
             
-            let url = self.iTunesUrl(searchText: searchBar.text!)
+            let url = self.iTunesUrl(searchText: searchBar.text!, category: segmentedControl.selectedSegmentIndex)
             //also an async process
             let session = URLSession.shared
             // datatask is for sending https get requests to the server url
-            let dataTask = session.dataTask(with: url, completionHandler: { data, response, error in
-                if let error = error {
-                    print("errro \(error)")
+            dataTask = session.dataTask(with: url, completionHandler: { data, response, error in
+                if let error = error as NSError?, error.code == -999 {
+                    //search was cancelled
+                    return
                 } else if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    
                     if let data = data, let jsonDictionary = self.parse(json: data) {
+                        
                         self.searchResults = self.parse(dictionary: jsonDictionary)
                         self.searchResults.sort(by: { result1, result2 in
                             return result1.name.localizedStandardCompare(result2.name) == .orderedAscending
@@ -251,7 +278,6 @@ extension SearchViewController: UISearchBarDelegate {
                             self.tableView.reloadData()
                         }
                         return
-                        
                     }
                 } else {
                     print("response \(response!)")
@@ -266,8 +292,7 @@ extension SearchViewController: UISearchBarDelegate {
                 
             })
             //we need the resume to start the closure code
-            dataTask.resume()
-            
+            dataTask?.resume()
         }
     }
 }
