@@ -36,7 +36,7 @@ class DetailViewController: UIViewController {
         super.viewDidLoad()
         
         view.tintColor = UIColor(red: 20/255, green: 160/225, blue: 160/255, alpha: 1)
-
+        view.backgroundColor = UIColor.clear
         popupView.layer.cornerRadius = 10
         
         //here we are creating a new gesture recognizer
@@ -102,6 +102,17 @@ extension DetailViewController: UIViewControllerTransitioningDelegate {
     func presentationController(forPresented presented: UIViewController, presenting: UIViewController?, source: UIViewController) -> UIPresentationController? {
         return DimmingPresentationController(presentedViewController: presented, presenting: presenting)
     }
+    
+    //here we call our new animation
+    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        return BounceAnimationController()
+    }
+    
+    //we call the slide out animation
+    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        return SlideOutAnimationController()
+    }
+    
 }
 
 //when the user taps outside the popup then it will close the popup
